@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_homescreen/demo_3d.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:grpc/grpc.dart';
+import 'package:jovial_svg/jovial_svg.dart';
+import 'package:flutter_homescreen/generated/applauncher.pbgrpc.dart';
 import 'package:flutter_homescreen/homescreen_model.dart';
-import 'package:flutter_homescreen/page_dashboard.dart';
-import 'package:flutter_homescreen/page_home.dart';
-import 'package:flutter_homescreen/page_hvac.dart';
-import 'package:flutter_homescreen/page_media.dart';
+import 'package:flutter_homescreen/page_apps.dart';
 import 'package:flutter_homescreen/widget_clock.dart';
 
-enum PageIndex { home, dashboard, hvac, media, demo3d }
+enum PageIndex { home, dashboard, hvac, media }
 
 class Homescreen extends StatefulWidget {
   Homescreen({Key? key}) : super(key: key);
@@ -21,27 +21,116 @@ class _HomescreenState extends State<Homescreen> with TickerProviderStateMixin {
   int _selectedIndex = 0;
   int _previousIndex = 0;
 
+  late ClientChannel channel;
+  late AppLauncherClient stub;
+  List<String> apps_stack = [];
+  static const agl_shell_channel = MethodChannel('flutter/agl_shell');
+
+  Future<List<AppInfo>> getAppList() async {
+    var response = await stub.listApplications(ListRequest());
+    for (AppInfo info in response.apps) {
+      debugPrint("Got app:");
+      debugPrint("$info");
+    }
+    return response.apps;
+  }
+
+  addAppToStack(String id) {
+    if (!apps_stack.contains(id)) {
+      apps_stack.add(id);
+    } else {
+      int current_pos = apps_stack.indexOf(id);
+      if (current_pos != (apps_stack.length - 1)) {
+        apps_stack.removeAt(current_pos);
+        apps_stack.add(id);
+      }
+    }
+  }
+
+  activateApp(String id) async {
+    try {
+      agl_shell_channel.invokeMethod('activate_app', { 'app_id': id, 'index': 0 });
+    } catch (e) {
+      print('Could not invoke flutter/agl_shell/activate_app: $e');
+    }
+    addAppToStack(id);
+  }
+
+  deactivateApp(String id) async {
+    if (apps_stack.contains(id)) {
+      apps_stack.remove(id);
+      if (apps_stack.isNotEmpty) {
+        activateApp(apps_stack.last);
+      }
+    }
+  }
+
+  handleAppStatusEvents() async {
+    try {
+      var response = stub.getStatusEvents(StatusRequest());
+      await for (var event in response) {
+        if (event.hasApp()) {
+          AppStatus app_status = event.app;
+          debugPrint("Got app status:");
+          debugPrint("$app_status");
+          if (app_status.hasId() && app_status.hasStatus()) {
+            if (app_status.status == "started") {
+              activateApp(app_status.id);
+            } else if (app_status.status == "terminated") {
+              deactivateApp(app_status.id);
+            }
+          }
+        }
+      }
+    } catch(e) {
+      print(e);
+    }
+  }
+
+  initState() {
+    debugPrint("_HomescreenState.initState!");
+    channel = ClientChannel('localhost',
+        port: 50052,
+        options: ChannelOptions(credentials: ChannelCredentials.insecure()));
+
+    stub = AppLauncherClient(channel);
+
+    handleAppStatusEvents();
+
+    super.initState();
+  }
+
+  void startApp(String id) async {
+    await stub.startApplication(StartRequest(id: id));
+  }
+
   setNavigationIndex(int index) {
-    setState(() {
-      _previousIndex = _selectedIndex;
-      _selectedIndex = index;
-    });
+    switch (PageIndex.values[index]) {
+      case PageIndex.dashboard:
+        startApp("dashboard_app");
+        return;
+      case PageIndex.hvac:
+        startApp("flutter_hvac");
+        return;
+      case PageIndex.media:
+        startApp("mediaplayer");
+        return;
+      default:
+        setState(() {
+          _previousIndex = _selectedIndex;
+          _selectedIndex = index;
+        });
+        activateApp("homescreen");
+    }
   }
 
   Widget _childForIndex(int selectedIndex) {
     switch (PageIndex.values[selectedIndex]) {
       case PageIndex.home:
-        return HomePage(
+        return AppsPage(
             key: ValueKey(selectedIndex),
-            onSetNavigationIndex: setNavigationIndex);
-      case PageIndex.dashboard:
-        return DashboardPage(key: ValueKey(selectedIndex));
-      case PageIndex.hvac:
-        return HVACPage(key: ValueKey(selectedIndex));
-      case PageIndex.media:
-        return MediaPage(key: ValueKey(selectedIndex));
-      case PageIndex.demo3d:
-        return Demo3dPage(key: ValueKey(selectedIndex));
+            getApps: getAppList,
+            startApp: startApp);
       default:
         return Text('Undefined');
     }
@@ -50,97 +139,105 @@ class _HomescreenState extends State<Homescreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Container(
-        color: Colors.deepPurple.shade50,
         child: Center(
             child: LayoutBuilder(
-          builder: _buildLayout,
-        )));
+      builder: _buildLayout,
+    )));
   }
 
   Widget _buildLayout(BuildContext context, BoxConstraints constraints) {
-    // size the icons so they cover the left edge of the screen
-    var iconSize = constraints.maxHeight / (PageIndex.values.length + 2);
-    var railSize = constraints.maxHeight / (PageIndex.values.length + 1);
+    var railSize = 160.0;
+    var iconSize = railSize / 2;
+    var foregroundColor = Theme.of(context)
+                          .navigationBarTheme
+                          .iconTheme!
+                          .resolve({MaterialState.pressed})!.color!;
 
     return Scaffold(
-      body: Row(
+      body: Column(
         children: <Widget>[
-          Container(
-            decoration: BoxDecoration(
-                gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                  Colors.blueGrey.shade800,
-                  Colors.blueGrey.shade900
-                ])),
-            child: Stack(
-              children: [
-                NavigationRail(
-                  backgroundColor: Colors.transparent,
-                  selectedIndex: _selectedIndex,
-                  groupAlignment: -1.0,
-                  minWidth: railSize,
-                  // leading widget?
-                  // leading: Icon(Icons.house_outlined, size: iconSize),
-                  // trailing widget does not expand to bottom
-                  onDestinationSelected: (int index) {
-                    setNavigationIndex(index);
-                  },
-                  selectedIconTheme: IconTheme.of(context).copyWith(
-                    size: iconSize,
-                    color: Colors.orangeAccent.shade100,
-                  ),
-                  unselectedIconTheme: IconTheme.of(context).copyWith(
-                    size: iconSize,
-                    color: Colors.blueGrey.shade400,
-                  ),
-                  labelType: NavigationRailLabelType.none,
-                  destinations: <NavigationRailDestination>[
-                    NavigationRailDestination(
-                      icon: Icon(Icons.house),
-                      selectedIcon: Icon(Icons.house),
-                      label: Text('Home'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.drive_eta),
-                      selectedIcon: Icon(Icons.drive_eta),
-                      label: Text('Dashboard'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.thermostat),
-                      selectedIcon: Icon(Icons.thermostat),
-                      label: Text('HVAC'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.music_note),
-                      selectedIcon: Icon(Icons.music_note),
-                      label: Text('Media'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.view_in_ar),
-                      selectedIcon: Icon(Icons.view_in_ar),
-                      label: Text('3D example'),
-                    ),
-                  ],
+          IntrinsicHeight(
+            child: Row(children: <Widget>[
+              Theme(
+                data: Theme.of(context).copyWith(
+                  // Disable indicator (for now?)
+                  navigationBarTheme: NavigationBarTheme.of(context)
+                      .copyWith(indicatorColor: Colors.transparent),
+                  // Disable splash animations
+                  splashFactory: NoSplash.splashFactory,
+                  hoverColor: Colors.transparent,
                 ),
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  // This is the info widget with time, date, etc.
-                  child: ClockWiddget(
-                    size: railSize,
-                    textColor: Colors.blueGrey.shade100,
-                  ),
-                )
-              ],
-            ),
-          ),
-          VerticalDivider(
-            thickness: 1,
-            width: 1,
-            color: Colors.grey.shade900,
+                child: Expanded(
+                  child: NavigationBar(
+                      onDestinationSelected: (int index) {
+                        setState(() {
+                          setNavigationIndex(index);
+                        });
+                      },
+                      selectedIndex: _selectedIndex,
+                      height: railSize,
+                      animationDuration: Duration(seconds: 0),
+                      destinations: <Widget>[
+                        NavigationDestination(
+                          icon: Icon(Icons.home, size: iconSize),
+                          label: 'Home',
+                        ),
+                        NavigationDestination(
+                          icon: Icon(Icons.drive_eta, size: iconSize),
+                          label: 'Dashboard',
+                        ),
+                        NavigationDestination(
+                          icon: Icon(Icons.thermostat, size: iconSize),
+                          label: 'HVAC',
+                        ),
+                        NavigationDestination(
+                          icon: Icon(Icons.music_note, size: iconSize),
+                          label: 'Media',
+                        ),
+                      ]),
+                ),
+              ),
+              SizedBox(
+                  width: 128,
+                  child: Container(
+                      color: NavigationBarTheme.of(context).backgroundColor)),
+              Container(
+                  color: NavigationBarTheme.of(context).backgroundColor,
+                  child: VerticalDivider(
+                      width: 32,
+                      thickness: 1,
+                      color: foregroundColor,
+                      indent: railSize / 16,
+                      endIndent: railSize / 16)),
+              Container(
+                  color: NavigationBarTheme.of(context).backgroundColor,
+                  child: ClockWidget(
+                      textColor: foregroundColor,
+                      size: railSize)),
+              Container(
+                  color: NavigationBarTheme.of(context).backgroundColor,
+                  child: VerticalDivider(
+                      width: 32,
+                      thickness: 1,
+                      color: foregroundColor,
+                      indent: railSize / 16,
+                      endIndent: railSize / 16)),
+              Container(
+                  color: NavigationBarTheme.of(context).backgroundColor,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: <Widget>[
+                      Icon(Icons.bluetooth, color: foregroundColor, size: 32),
+                      Icon(Icons.wifi, color: foregroundColor, size: 32),
+                      Icon(Icons.signal_cellular_4_bar, color: foregroundColor, size: 32),
+                    ])),
+              SizedBox(
+                  width: 16,
+                  child: Container(
+                      color:
+                          Theme.of(context).navigationBarTheme.backgroundColor)),
+            ]),
           ),
           // This is the main content.
           Expanded(
@@ -182,6 +279,16 @@ class _HomescreenState extends State<Homescreen> with TickerProviderStateMixin {
               ),
             ),
           ),
+          SizedBox(
+              height: railSize,
+              child: Container(
+                  color: NavigationBarTheme.of(context).backgroundColor,
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: ScalableImageWidget.fromSISource(
+                          si: ScalableImageSource.fromSvg(rootBundle,
+                            'images/Utility_Logo_Grey-01.svg'))))
+          )
         ],
       ),
     );

@@ -6,7 +6,8 @@ class LayoutSizeHelper {
 
   LayoutSizeHelper(context)
       : _size = MediaQuery.of(context).size,
-        _ratio = MediaQuery.of(context).devicePixelRatio;
+        //_ratio = MediaQuery.of(context).devicePixelRatio;
+        _ratio = 9 / 16;
 
   update(context) {
     _size = MediaQuery.of(context).size;
