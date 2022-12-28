@@ -1,17 +1,18 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_homescreen/config.dart';
 import 'package:grpc/grpc.dart';
-import 'package:jovial_svg/jovial_svg.dart';
 import 'package:flutter_homescreen/generated/applauncher.pbgrpc.dart';
-import 'package:flutter_homescreen/homescreen_model.dart';
 import 'package:flutter_homescreen/page_apps.dart';
 import 'package:flutter_homescreen/widget_clock.dart';
+import 'package:flutter_homescreen/bottom_panel.dart';
 
 enum PageIndex { home, dashboard, hvac, media }
 
 class Homescreen extends StatefulWidget {
-  Homescreen({Key? key}) : super(key: key);
+  Homescreen({Key? key, required this.client}) : super(key: key);
+  final HttpClient client;
 
   @override
   _HomescreenState createState() => _HomescreenState();
@@ -49,7 +50,8 @@ class _HomescreenState extends State<Homescreen> with TickerProviderStateMixin {
 
   activateApp(String id) async {
     try {
-      agl_shell_channel.invokeMethod('activate_app', { 'app_id': id, 'index': 0 });
+      agl_shell_channel
+          .invokeMethod('activate_app', {'app_id': id, 'index': 0});
     } catch (e) {
       print('Could not invoke flutter/agl_shell/activate_app: $e');
     }
@@ -82,7 +84,7 @@ class _HomescreenState extends State<Homescreen> with TickerProviderStateMixin {
           }
         }
       }
-    } catch(e) {
+    } catch (e) {
       print(e);
     }
   }
@@ -149,9 +151,9 @@ class _HomescreenState extends State<Homescreen> with TickerProviderStateMixin {
     var railSize = 160.0;
     var iconSize = railSize / 2;
     var foregroundColor = Theme.of(context)
-                          .navigationBarTheme
-                          .iconTheme!
-                          .resolve({MaterialState.pressed})!.color!;
+        .navigationBarTheme
+        .iconTheme!
+        .resolve({MaterialState.pressed})!.color!;
 
     return Scaffold(
       body: Column(
@@ -211,9 +213,8 @@ class _HomescreenState extends State<Homescreen> with TickerProviderStateMixin {
                       endIndent: railSize / 16)),
               Container(
                   color: NavigationBarTheme.of(context).backgroundColor,
-                  child: ClockWidget(
-                      textColor: foregroundColor,
-                      size: railSize)),
+                  child:
+                      ClockWidget(textColor: foregroundColor, size: railSize)),
               Container(
                   color: NavigationBarTheme.of(context).backgroundColor,
                   child: VerticalDivider(
@@ -225,70 +226,64 @@ class _HomescreenState extends State<Homescreen> with TickerProviderStateMixin {
               Container(
                   color: NavigationBarTheme.of(context).backgroundColor,
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: <Widget>[
-                      Icon(Icons.bluetooth, color: foregroundColor, size: 32),
-                      Icon(Icons.wifi, color: foregroundColor, size: 32),
-                      Icon(Icons.signal_cellular_4_bar, color: foregroundColor, size: 32),
-                    ])),
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: <Widget>[
+                        Icon(Icons.bluetooth, color: foregroundColor, size: 32),
+                        Icon(Icons.wifi, color: foregroundColor, size: 32),
+                        Icon(Icons.signal_cellular_4_bar,
+                            color: foregroundColor, size: 32),
+                      ])),
               SizedBox(
                   width: 16,
                   child: Container(
-                      color:
-                          Theme.of(context).navigationBarTheme.backgroundColor)),
+                      color: Theme.of(context)
+                          .navigationBarTheme
+                          .backgroundColor)),
             ]),
           ),
           // This is the main content.
           Expanded(
-            child: ChangeNotifierProvider(
-              // See: https://docs.flutter.dev/development/data-and-backend/state-mgmt/simple
-              // Also: https://docs.flutter.dev/development/data-and-backend/state-mgmt/options
-              create: (context) => HomescreenModel(),
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 500),
-                reverseDuration: const Duration(milliseconds: 500),
-                switchInCurve: Curves.easeInOut,
-                switchOutCurve: Curves.easeInOut,
-                transitionBuilder: (Widget child, Animation<double> animation) {
-                  if (child.key != ValueKey(_selectedIndex)) {
-                    return FadeTransition(
-                      opacity: Tween<double>(begin: 1.0, end: 1.0)
-                          .animate(animation),
-                      child: child,
-                    );
-                  }
-                  Offset beginOffset = new Offset(
-                      0.0, (_selectedIndex > _previousIndex ? 1.0 : -1.0));
-                  return SlideTransition(
-                    position:
-                        Tween<Offset>(begin: beginOffset, end: Offset.zero)
-                            .animate(animation),
-                    child: FadeTransition(
-                      opacity: Tween<double>(begin: 0.0, end: 1.0).animate(
-                        CurvedAnimation(
-                          parent: animation,
-                          curve: Interval(0.5, 1.0),
-                        ),
-                      ),
-                      child: child,
-                    ),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 500),
+              reverseDuration: const Duration(milliseconds: 500),
+              switchInCurve: Curves.easeInOut,
+              switchOutCurve: Curves.easeInOut,
+              transitionBuilder: (Widget child, Animation<double> animation) {
+                if (child.key != ValueKey(_selectedIndex)) {
+                  return FadeTransition(
+                    opacity:
+                        Tween<double>(begin: 1.0, end: 1.0).animate(animation),
+                    child: child,
                   );
-                },
-                child: _childForIndex(_selectedIndex),
-              ),
+                }
+                Offset beginOffset = new Offset(
+                    0.0, (_selectedIndex > _previousIndex ? 1.0 : -1.0));
+                return SlideTransition(
+                  position: Tween<Offset>(begin: beginOffset, end: Offset.zero)
+                      .animate(animation),
+                  child: FadeTransition(
+                    opacity: Tween<double>(begin: 0.0, end: 1.0).animate(
+                      CurvedAnimation(
+                        parent: animation,
+                        curve: Interval(0.5, 1.0),
+                      ),
+                    ),
+                    child: child,
+                  ),
+                );
+              },
+              child: _childForIndex(_selectedIndex),
             ),
           ),
-          SizedBox(
-              height: railSize,
-              child: Container(
-                  color: NavigationBarTheme.of(context).backgroundColor,
-                  child: Align(
-                    alignment: Alignment.center,
-                    child: ScalableImageWidget.fromSISource(
-                          si: ScalableImageSource.fromSvg(rootBundle,
-                            'images/Utility_Logo_Grey-01.svg'))))
-          )
+          Stack(children: [
+            BottomPanelWidget(
+                height: railSize,
+                color: NavigationBarTheme.of(context).backgroundColor),
+            Align(
+                alignment: Alignment.bottomLeft,
+                child: GetConfig(client: widget.client))
+          ]),
         ],
       ),
     );
