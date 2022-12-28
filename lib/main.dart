@@ -1,14 +1,22 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_homescreen/homescreen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_homescreen/vehicle-signals/viss_config.dart';
 
-void main() {
-  runApp(MyApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  HttpClient client = await initializeClient();
+  runApp(ProviderScope(child: MyApp(client: client)));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
+  MyApp({Key? key, required this.client}) : super(key: key);
+  final HttpClient client;
+
   // This widget is the root of your application.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     const navBarColor = const Color(0xff181818);
     const navBarIconColor = Colors.white;
 
@@ -24,7 +32,7 @@ class MyApp extends StatelessWidget {
               color: navBarIconColor,
             ))),
       ),
-      home: Homescreen(),
+      home: Homescreen(client: client),
     );
   }
 }

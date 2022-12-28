@@ -1,9 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:jovial_svg/jovial_svg.dart';
-import 'package:flutter_homescreen/homescreen.dart';
 import 'package:flutter_homescreen/layout_size_helper.dart';
 import 'package:flutter_homescreen/generated/applauncher.pb.dart';
 
@@ -11,7 +9,7 @@ import 'package:flutter_homescreen/generated/applauncher.pb.dart';
 class AppsPage extends StatefulWidget {
   final Future<List<AppInfo>> Function() getApps;
   final Function(String id) startApp;
-  
+
   const AppsPage({Key? key, required this.getApps, required this.startApp})
       : super(key: key);
 
@@ -26,7 +24,7 @@ class _AppsPageState extends State<AppsPage> {
   initState() {
     widget.getApps().then((val) => setState(() {
           apps = val;
-          }));
+        }));
 
     super.initState();
   }
@@ -94,8 +92,8 @@ class _AppsPageEntryState extends State<_AppsPageEntry> {
   void initState() {
     if (widget.iconPath.endsWith(".svg")) {
       readSvgIcon().then((val) => setState(() {
-          svgIconLoaded = val;
-        }));
+            svgIconLoaded = val;
+          }));
     }
     super.initState();
   }
@@ -104,7 +102,8 @@ class _AppsPageEntryState extends State<_AppsPageEntry> {
     if (widget.iconPath.endsWith(".svg")) {
       var iconFile = File(widget.iconPath);
       if (await iconFile.exists()) {
-        svgIcon = await ScalableImage.fromSvgStream(iconFile.openRead().transform(utf8.decoder));
+        svgIcon = await ScalableImage.fromSvgStream(
+            iconFile.openRead().transform(utf8.decoder));
         return true;
       }
     }
@@ -114,25 +113,21 @@ class _AppsPageEntryState extends State<_AppsPageEntry> {
   Widget buildIcon() {
     if (svgIconLoaded) {
       return GestureDetector(
-        onTap: () {
-          widget.appSelected(widget.id);
-        },
-        child: SizedBox.expand(
-          child: ScalableImageWidget(si: svgIcon))
-        );
+          onTap: () {
+            widget.appSelected(widget.id);
+          },
+          child: SizedBox.expand(child: ScalableImageWidget(si: svgIcon)));
     } else {
       return OutlinedButton(
-              style: ElevatedButton.styleFrom(
-                shape: CircleBorder(),
-                padding: EdgeInsets.all(8),
-                side: BorderSide(width: 4, color: iconColor),
-              ),
-              onPressed: () {
-                widget.appSelected(widget.id);
-              },
-              child: Icon(Icons.question_mark,
-                  color: iconColor,
-                  size: 160.0));
+          style: ElevatedButton.styleFrom(
+            shape: CircleBorder(),
+            padding: EdgeInsets.all(8),
+            side: BorderSide(width: 4, color: iconColor),
+          ),
+          onPressed: () {
+            widget.appSelected(widget.id);
+          },
+          child: Icon(Icons.question_mark, color: iconColor, size: 160.0));
     }
   }
 
