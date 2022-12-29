@@ -23,6 +23,7 @@ class _AppsPageState extends State<AppsPage> {
   @override
   initState() {
     widget.getApps().then((val) => setState(() {
+          val.sort((a, b) => a.name.compareTo(b.name));
           apps = val;
         }));
 
@@ -122,12 +123,23 @@ class _AppsPageEntryState extends State<_AppsPageEntry> {
           style: ElevatedButton.styleFrom(
             shape: CircleBorder(),
             padding: EdgeInsets.all(8),
-            side: BorderSide(width: 4, color: iconColor),
+            side: BorderSide(width: 3, color: iconColor),
           ),
           onPressed: () {
             widget.appSelected(widget.id);
           },
-          child: Icon(Icons.question_mark, color: iconColor, size: 160.0));
+          child: SizedBox(
+              height: 160,
+              width: 160,
+              child: Center(
+                  child: Text(widget.label.toUpperCase().substring(0, 1),
+                      style: TextStyle(
+                        fontSize: 100,
+                        foreground: Paint()
+                          ..style = PaintingStyle.stroke
+                          ..strokeWidth = 3
+                          ..color = iconColor,
+                      )))));
     }
   }
 
