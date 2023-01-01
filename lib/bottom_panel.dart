@@ -36,6 +36,11 @@ class _BottomPanelWidgetState extends ConsumerState<BottomPanelWidget> {
   Widget build(BuildContext context) {
     final int index = ref.watch(StackIndexProvider);
 
+    void handleLogoTap() {
+      ref.read(StackIndexProvider.notifier).state = 1;
+      timer.reset();
+    }
+
     return SizedBox(
         height: widget.height,
         child: IndexedStack(index: index, children: <Widget>[
@@ -47,10 +52,7 @@ class _BottomPanelWidgetState extends ConsumerState<BottomPanelWidget> {
                     child: ScalableImageWidget.fromSISource(
                         si: ScalableImageSource.fromSvg(
                             rootBundle, 'images/Utility_Logo_Grey-01.svg')))),
-            onTap: () {
-              ref.read(StackIndexProvider.notifier).state = 1;
-              timer.reset();
-            },
+            onTap: () => handleLogoTap(),
           ),
           Container(
               color: widget.color,
