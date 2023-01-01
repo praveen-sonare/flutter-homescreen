@@ -40,34 +40,22 @@ class _ClockWidgetState extends State<ClockWidget> {
 
   @override
   Widget build(BuildContext context) {
-    TextStyle? textStyle = Theme.of(context)
-        .textTheme
-        .labelLarge
-        ?.copyWith(color: widget.textColor);
+    TextStyle? textStyle = TextStyle(fontSize: 32, color: widget.textColor);
+
     return Container(
       height: widget.size,
-      //padding: EdgeInsets.all(16.0),
+      padding: EdgeInsets.all(16.0),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          SizedBox(height: 16),
-          FittedBox(
-            fit: BoxFit.contain,
-            child: Text(
-              DateFormat('EEEE').format(_now),
-              style: textStyle,
-            ),
+          Text(
+            DateFormat('EEEE').format(_now),
+            style: textStyle,
           ),
-          //const Divider(thickness: 1),
-          FittedBox(
-            fit: BoxFit.contain,
-            child: Text(
-              DateFormat.jm().format(_now),
-              style: textStyle,
-            ),
-          ),
-          SizedBox(height: 16),
+          SizedBox(height: 8),
+          Text(DateFormat.jm().format(_now), style: textStyle),
         ],
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       ),
       alignment: Alignment.center,
     );
