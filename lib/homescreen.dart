@@ -148,7 +148,7 @@ class _HomescreenState extends State<Homescreen> with TickerProviderStateMixin {
   }
 
   Widget _buildLayout(BuildContext context, BoxConstraints constraints) {
-    var railSize = 50.0;
+    var railSize = 160.0;
     var iconSize = railSize / 2;
     var foregroundColor = Theme.of(context)
         .navigationBarTheme
